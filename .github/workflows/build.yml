@@ -1,0 +1,46 @@
+
+name: Build Wheel on edge-tts Update
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build tools
+        run: |
+          pip install --upgrade pip
+          pip install build requests
+
+      - name: Check edge-tts latest version
+        id: check_version
+        run: |
+          curl -s https://pypi.org/pypi/edge-tts/json > edge_tts.json
+          latest_version=$(jq -r '.info.version' edge_tts.json)
+          echo "edge_tts_version=$latest_version" >> "$GITHUB_ENV"
+
+      - name: Update pyproject.toml if needed
+        run: |
+          sed -i "s/edge-tts.*/edge-tts==${{ env.edge_tts_version }}\"/" pyproject.toml
+
+      - name: Build wheel
+        run: python -m build
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.edge_tts_version }}
+          files: dist/*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 */12 * * *'
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -25,21 +25,33 @@ jobs:
           pip install --upgrade pip
           pip install build requests
 
-      - name: Check edge-tts latest version
-        id: check_version
+      - name: Check and update edge-tts version
+        id: check_and_update
         run: |
-          curl -s https://pypi.org/pypi/edge-tts/json > edge_tts.json
-          latest_version=$(jq -r '.info.version' edge_tts.json)
-          echo "edge_tts_version=$latest_version" >> "$GITHUB_ENV"
+          latest_version=$(curl -s https://pypi.org/pypi/edge-tts/json | jq -r '.info.version')
+          echo "Latest edge-tts version: $latest_version"
 
-      - name: Update pyproject.toml if needed
-        run: |
-          sed -i "s/edge-tts.*/edge-tts==${{ env.edge_tts_version }}\"/" pyproject.toml
+          current_version=$(grep 'edge-tts==' pyproject.toml | sed 's/.*edge-tts==\([^"]*\)".*/\1/')
+          echo "Current pyproject.toml version: $current_version"
+
+          if [ "$latest_version" == "$current_version" ]; then
+            echo "No update needed. Skipping build."
+            echo "skip_build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          else
+            echo "edge_tts_version=$latest_version" >> "$GITHUB_ENV"
+            echo "skip_build=false" >> "$GITHUB_OUTPUT"
+
+            sed -i "s/edge-tts.*/edge-tts==${latest_version}\"/" pyproject.toml
+            sed -i "s/version = \".*\"/version = \"${latest_version}\"/" pyproject.toml
+          fi
 
       - name: Build wheel
+        if: steps.check_and_update.outputs.skip_build != 'true'
         run: python -m build
 
       - name: Upload to GitHub Releases
+        if: steps.check_and_update.outputs.skip_build != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.edge_tts_version }}

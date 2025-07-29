@@ -6,8 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "realvoice"
 version = "1.0.0"
 description = "Wrapper around edge-tts for Unity integration"
-authors = [{ name="Carruto", email="support@carruto.com" }]
-dependencies = ["edge-tts"]
+authors = [
+    { name = "Carruto", email = "support@carruto.com" }
+]
+dependencies = [
+    "edge-tts"
+]
 
 [project.scripts]
 realvoice = "realvoice.cli:main"
